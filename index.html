@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>VBus GPS Tracker</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY"></script>
+  <style>
+    #map { height: 500px; width: 100%; }
+  </style>
+</head>
+<body>
+  <h2>VBus GPS Tracker</h2>
+
+  <label>Select Bus:</label>
+  <select id="busSelect">
+    <option value="vbus1">Bus 1</option>
+    <option value="vbus2">Bus 2</option>
+    <option value="vbus3">Bus 3</option>
+  </select>
+  <button id="startBtn">Start Sending Location</button>
+  <p id="status">Not started</p>
+
+  <div id="map"></div>
+
+  <script>
+    // ===== Firebase Config =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyDFpFTH0l3l2nKjkeebEoO9fV4yexJvSHQ",
+      authDomain: "vbus057.firebaseapp.com",
+      databaseURL: "https://vbus057-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "vbus057",
+      storageBucket: "vbus057.firebasestorage.app",
+      messagingSenderId: "850686325088",
+      appId:"1:850686325088:web:cb02bf5d98b1ede2f72e05" 
+    };
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // ===== Bus IDs =====
+    const BUS_IDS = ['vbus1', 'vbus2', 'vbus3'];
+    const busMarkers = {}; // Store markers for all buses
+
+    // Initialize Google Map
+    const map = new google.maps.Map(document.getElementById('map'), {
+      center: { lat: 23.0, lng: 87.0 },
+      zoom: 15
+    });
+
+    // Create markers for each bus
+    BUS_IDS.forEach(id => {
+      busMarkers[id] = new google.maps.Marker({
+        position: { lat: 23.0, lng: 87.0 },
+        map: map,
+        title: id,
+        icon: 'http://maps.google.com/mapfiles/ms/icons/bus.png'
+      });
+
+      // Listen to Firebase location updates
+      database.ref('buses/' + id + '/location').on('value', snapshot => {
+        const data = snapshot.val();
+        if (data) {
+          const newPos = { lat: data.lat, lng: data.lng };
+          busMarkers[id].setPosition(newPos);
+        }
+      });
+    });
+
+    // Selected bus
+    let selectedBusId = document.getElementById('busSelect').value;
+    document.getElementById('busSelect').addEventListener('change', () => {
+      selectedBusId = document.getElementById('busSelect').value;
+    });
+
+    // Start sending location
+    document.getElementById('startBtn').addEventListener('click', () => {
+      if (navigator.geolocation) {
+        document.getElementById('status').innerText = 'Sending location...';
+        navigator.geolocation.watchPosition(pos => {
+          const payload = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            speed: pos.coords.speed || 0,
+            time: Date.now()
+          };
+          database.ref('buses/' + selectedBusId + '/location').set(payload);
+        }, err => {
+          document.getElementById('status').innerText = 'Error: ' + err.message;
+        }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+      } else {
+        alert('Geolocation not supported by your browser.');
+      }
+    });
+  </script>
+</body>
+</html>
